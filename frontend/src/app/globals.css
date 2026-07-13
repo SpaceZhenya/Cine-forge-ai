@@ -2,48 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 body {
-  font-family: 'Inter', sans-serif;
   background: #050508;
   color: #e0e0e0;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
-@layer base {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #1e1e2a transparent;
-  }
+.glass-card {
+  background: rgba(18, 18, 26, 0.8);
+  border: 1px solid rgba(30, 30, 42, 0.6);
+  backdrop-filter: blur(12px);
 }
 
-@layer components {
-  .glass-card {
-    background: rgba(18, 18, 26, 0.8);
-    border: 1px solid rgba(30, 30, 42, 0.6);
-    backdrop-filter: blur(12px);
-  }
-
-  .gradient-text {
-    background: linear-gradient(135deg, #6C5CE7, #00CEC9, #FD79A8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .pipeline-step {
-    @apply flex items-center gap-3 p-4 rounded-xl glass-card transition-all duration-300;
-  }
-
-  .pipeline-step.active {
-    @apply border-primary shadow-lg shadow-primary/20;
-  }
-
-  .pipeline-step.done {
-    @apply border-secondary/50;
-  }
-
-  .pipeline-step.pending {
-    @apply opacity-40;
-  }
+.gradient-text {
+  background: linear-gradient(135deg, #6C5CE7, #00CEC9, #FD79A8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

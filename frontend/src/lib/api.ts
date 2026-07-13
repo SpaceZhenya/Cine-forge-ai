@@ -1,42 +1,39 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) },
+async function req<T>(path: string, opts?: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText}${body ? `: ${body}` : ""}`);
-  }
-  return res.json();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Error ${res.status}`);
+  return body as T;
 }
 
 export const api = {
   createFilm: (prompt: string) =>
-    request<{ id: string; status: string }>("/api/films", {
+    req<{ id: string; status: string }>("/api/films", {
       method: "POST",
       body: JSON.stringify({ prompt }),
     }),
 
+  getFilm: (id: string) => req<any>(`/api/films/${id}`),
+
+  listFilms: () => req<any[]>("/api/films"),
+
   generateFilm: (id: string) =>
-    request<{ id: string; status: string; title: string }>(`/api/films/${id}/generate`, {
+    req<{ id: string; status: string }>(`/api/films/${id}/generate`, {
       method: "POST",
     }),
 
-  getFilm: (id: string) => request<any>(`/api/films/${id}`),
-
-  listFilms: () => request<any[]>("/api/films"),
-
   rewriteFilm: (id: string, instruction: string) =>
-    request<{ id: string; status: string; message: string }>(`/api/films/${id}/rewrite`, {
+    req<{ id: string; status: string }>(`/api/films/${id}/rewrite`, {
       method: "POST",
       body: JSON.stringify({ instruction }),
     }),
 
   collaborate: (id: string, userId: string, suggestion: string) =>
-    request<{ message: string }>(`/api/films/${id}/collaborate`, {
+    req<{ message: string }>(`/api/films/${id}/collaborate`, {
       method: "POST",
       body: JSON.stringify({ user_id: userId, suggestion }),
     }),

@@ -2,10 +2,5 @@ node_modules/
 .next/
 __pycache__/
 *.pyc
-.env
-*.egg-info/
-dist/
-output/
-audio/
-.pytest_cache/
 *.db
+.env
