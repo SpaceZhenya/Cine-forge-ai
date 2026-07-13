@@ -1,7 +1,7 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// API calls go to the same Next.js server — no separate backend needed.
 
 async function req<T>(path: string, opts?: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
     ...opts,
   });
