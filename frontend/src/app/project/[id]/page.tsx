@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { useFilmStore } from "@/store/film";
 
@@ -25,6 +26,7 @@ export default function ProjectPage() {
   const { id } = params as { id: string };
   const [film, setFilm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [rewritePrompt, setRewritePrompt] = useState("");
   const [collabPrompt, setCollabPrompt] = useState("");
@@ -34,11 +36,13 @@ export default function ProjectPage() {
 
   const loadFilm = useCallback(async () => {
     try {
+      setError("");
       const data = await api.getFilm(id);
       setFilm(data);
       setStatus(data.status);
     } catch (err) {
-      console.error(err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -46,7 +50,7 @@ export default function ProjectPage() {
 
   useEffect(() => {
     loadFilm();
-    const interval = setInterval(loadFilm, 3000);
+    const interval = setInterval(loadFilm, 5000);
     return () => clearInterval(interval);
   }, [loadFilm]);
 
@@ -54,8 +58,12 @@ export default function ProjectPage() {
     setGenerating(true);
     try {
       await api.generateFilm(id);
+      toast.success("Film generation started!");
     } catch (err) {
-      console.error(err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Generation failed: ${msg}`);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -63,10 +71,12 @@ export default function ProjectPage() {
     if (!rewritePrompt.trim()) return;
     try {
       await api.rewriteFilm(id, rewritePrompt.trim());
+      toast.success("Rewrite applied! Reloading...");
       setRewritePrompt("");
       await loadFilm();
     } catch (err) {
-      console.error(err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Rewrite failed: ${msg}`);
     }
   };
 
@@ -74,10 +84,12 @@ export default function ProjectPage() {
     if (!collabPrompt.trim()) return;
     try {
       await api.collaborate(id, "user_" + Math.random().toString(36).slice(2, 8), collabPrompt.trim());
+      toast.success("Suggestion added!");
       setCollabPrompt("");
       await loadFilm();
     } catch (err) {
-      console.error(err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Failed to add suggestion: ${msg}`);
     }
   };
 
@@ -87,6 +99,23 @@ export default function ProjectPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error && !film) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 text-center py-24">
+        <p className="text-red-400 text-xl mb-2">Failed to load film</p>
+        <p className="text-muted text-sm mb-6">{error}</p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={loadFilm} className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90">
+            Retry
+          </button>
+          <a href="/" className="px-6 py-3 rounded-xl glass-card border-border text-muted hover:text-white">
+            Create new film
+          </a>
+        </div>
       </div>
     );
   }
@@ -109,7 +138,7 @@ export default function ProjectPage() {
           <span className={`text-xs px-3 py-1 rounded-full ${film.status === "completed" ? "bg-secondary/20 text-secondary" : film.status === "failed" ? "bg-red-500/20 text-red-400" : "bg-primary/20 text-primary"}`}>
             {film.status}
           </span>
-          {film.status !== "completed" && film.status !== "failed" && (
+          {(film.status === "pending" || film.status === "failed") && (
             <button
               onClick={handleGenerate}
               disabled={generating}
@@ -121,7 +150,7 @@ export default function ProjectPage() {
         </div>
       </header>
 
-      {!(film.status === "completed" || film.status === "failed") && (
+      {film.status !== "completed" && film.status !== "failed" && film.status !== "pending" && (
         <section className="mb-10">
           <h2 className="text-lg font-semibold mb-4">Pipeline Progress</h2>
           <div className="grid gap-2">
@@ -206,7 +235,7 @@ export default function ProjectPage() {
                 <input
                   value={rewritePrompt}
                   onChange={(e) => setRewritePrompt(e.target.value)}
-                  placeholder="e.g. Make the protagonist a villain..."
+                  placeholder='e.g. "Make the protagonist a villain..."'
                   className="flex-1 p-3 rounded-xl glass-card border-border text-white placeholder-muted focus:outline-none focus:border-primary"
                 />
                 <button onClick={handleRewrite} className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90">
@@ -220,7 +249,7 @@ export default function ProjectPage() {
                 <input
                   value={collabPrompt}
                   onChange={(e) => setCollabPrompt(e.target.value)}
-                  placeholder="e.g. Add a dragon..."
+                  placeholder='e.g. "Add a dragon..."'
                   className="flex-1 p-3 rounded-xl glass-card border-border text-white placeholder-muted focus:outline-none focus:border-primary"
                 />
                 <button onClick={handleCollab} className="px-6 py-3 rounded-xl bg-secondary text-black font-medium hover:bg-secondary/90">
@@ -240,6 +269,12 @@ export default function ProjectPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {!film.full_script && film.status === "completed" && (
+          <div className="text-center py-12 text-muted">
+            No script content available for this film.
           </div>
         )}
       </section>

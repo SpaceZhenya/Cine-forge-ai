@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { useFilmStore } from "@/store/film";
 
@@ -24,9 +25,15 @@ export default function HomePage() {
     setLoading(true);
     try {
       const film = await api.createFilm(prompt.trim());
+      if (!film?.id) {
+        throw new Error("Server returned empty film id");
+      }
       setFilm(film.id);
+      toast.success("Film project created! Redirecting...");
       router.push(`/project/${film.id}`);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Failed to create film: ${msg}`);
       console.error(err);
     } finally {
       setLoading(false);
