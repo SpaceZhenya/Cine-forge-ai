@@ -6,25 +6,38 @@ Supports co-authoring and infinite movie mode.
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional
+from pydantic import BaseModel
 import json
 
-from app.models import FilmModel, SceneModel, CharacterModel, get_db
+from app.models import FilmModel, get_db
 from shared.types import FilmProject, FilmIdea, PipelineStatus
 from app.pipeline.graph import create_film_pipeline
+
+
+class CreateFilmRequest(BaseModel):
+    prompt: str
+
+
+class RewriteFilmRequest(BaseModel):
+    instruction: str
+
+
+class CollaborateRequest(BaseModel):
+    user_id: str
+    suggestion: str
 
 router = APIRouter(prefix="/api/films", tags=["films"])
 
 
 @router.post("")
-async def create_film(prompt: str, db: AsyncSession = Depends(get_db)):
+async def create_film(body: CreateFilmRequest, db: AsyncSession = Depends(get_db)):
     project = FilmProject(
-        idea=FilmIdea(prompt=prompt),
+        idea=FilmIdea(prompt=body.prompt),
         status=PipelineStatus.PENDING,
     )
 
     db_film = FilmModel(
-        prompt=prompt,
+        prompt=body.prompt,
         status=project.status.value,
     )
     db.add(db_film)
@@ -89,14 +102,14 @@ async def list_films(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{film_id}/rewrite")
-async def rewrite_film(film_id: str, instruction: str, db: AsyncSession = Depends(get_db)):
+async def rewrite_film(film_id: str, body: RewriteFilmRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(FilmModel).where(FilmModel.id == film_id))
     db_film = result.scalar_one_or_none()
     if not db_film:
         raise HTTPException(404, "Film not found")
 
     project = _db_to_project(db_film)
-    project.idea.prompt = f"{project.idea.prompt}. REWRITE: {instruction}"
+    project.idea.prompt = f"{project.idea.prompt}. REWRITE: {body.instruction}"
     project.version += 1
 
     old_id = project.id
@@ -108,18 +121,18 @@ async def rewrite_film(film_id: str, instruction: str, db: AsyncSession = Depend
     db_film.prompt = project.idea.prompt
     await db.commit()
 
-    return {"id": db_film.id, "status": "pending", "message": f"Rewrite in progress: {instruction}"}
+    return {"id": db_film.id, "status": "pending", "message": f"Rewrite in progress: {body.instruction}"}
 
 
 @router.post("/{film_id}/collaborate")
-async def add_collaboration(film_id: str, user_id: str, suggestion: str, db: AsyncSession = Depends(get_db)):
+async def add_collaboration(film_id: str, body: CollaborateRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(FilmModel).where(FilmModel.id == film_id))
     db_film = result.scalar_one_or_none()
     if not db_film:
         raise HTTPException(404, "Film not found")
 
     co_authors = db_film.co_authors or []
-    co_authors.append({"user_id": user_id, "suggestion": suggestion})
+    co_authors.append({"user_id": body.user_id, "suggestion": body.suggestion})
     db_film.co_authors = co_authors
     await db.commit()
 
