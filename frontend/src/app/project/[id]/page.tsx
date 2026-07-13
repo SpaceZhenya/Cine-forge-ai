@@ -4,20 +4,19 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 
-const STEPS = [
-  { key: "producing", label: "AI Producer", desc: "Generating idea" },
-  { key: "screenwriting", label: "AI Screenwriter", desc: "Writing script" },
-  { key: "directing", label: "AI Director", desc: "Breaking down scenes" },
-  { key: "storyboarding", label: "AI Storyboard", desc: "Creating frames" },
-  { key: "camera", label: "AI Camera", desc: "Planning shots" },
-  { key: "acting", label: "AI Actor", desc: "Character emotions" },
-  { key: "voicing", label: "AI Voice", desc: "Voice generation" },
-  { key: "composing", label: "AI Composer", desc: "Music composition" },
-  { key: "editing", label: "AI Editor", desc: "Final assembly" },
-  { key: "exporting", label: "Export", desc: "MP4 + Trailer + Poster" },
+const PIPELINE = [
+  { id: "producing", label: "AI Producer", desc: "Creating film idea", emoji: "💡" },
+  { id: "screenwriting", label: "AI Screenwriter", desc: "Writing screenplay", emoji: "📝" },
+  { id: "directing", label: "AI Director", desc: "Breaking down scenes", emoji: "🎬" },
+  { id: "storyboarding", label: "AI Storyboard", desc: "Generating storyboards", emoji: "🎨" },
+  { id: "camera", label: "AI Camera", desc: "Planning camera movement", emoji: "📷" },
+  { id: "acting", label: "AI Actor", desc: "Creating character emotions", emoji: "🎭" },
+  { id: "voicing", label: "AI Voice", desc: "Generating voice lines", emoji: "🎙" },
+  { id: "composing", label: "AI Composer", desc: "Composing music", emoji: "🎵" },
+  { id: "editing", label: "AI Editor", desc: "Assembling final film", emoji: "✂️" },
 ];
 
-const ORDER = STEPS.map((s) => s.key);
+const PIPELINE_IDS = PIPELINE.map(p => p.id);
 
 export default function Project() {
   const { id } = useParams() as { id: string };
@@ -25,15 +24,16 @@ export default function Project() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [genLoading, setGenLoading] = useState(false);
-  const [tab, setTab] = useState<"script" | "video" | "collab">("script");
+  const [tab, setTab] = useState("script");
   const [rewrite, setRewrite] = useState("");
   const [suggestion, setSuggestion] = useState("");
+  const [expandedScene, setExpandedScene] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
+      setError("");
       const data = await api.getFilm(id);
       setFilm(data);
-      setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error loading film");
     } finally {
@@ -41,7 +41,7 @@ export default function Project() {
     }
   }, [id]);
 
-  useEffect(() => { load(); const i = setInterval(load, 4000); return () => clearInterval(i); }, [load]);
+  useEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i); }, [load]);
 
   const generate = async () => {
     setGenLoading(true);
@@ -50,6 +50,18 @@ export default function Project() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setGenLoading(false);
+    }
+  };
+
+  const infiniteMovie = async () => {
+    setGenLoading(true);
+    try {
+      await api.generateFilm(id, true); // infinite mode
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Infinite movie failed");
     } finally {
       setGenLoading(false);
     }
@@ -79,7 +91,7 @@ export default function Project() {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
     </div>
   );
 
@@ -96,49 +108,73 @@ export default function Project() {
 
   if (!film) return null;
 
-  const stepIndex = ORDER.indexOf(film.status || "");
+  const pipeline = film.pipeline;
+  const pipIndex = PIPELINE_IDS.indexOf(film.status || "");
+  const scenes = pipeline?.scenes || [];
 
   return (
-    <div className="max-w-6xl mx-auto px-6">
+    <div className="max-w-7xl mx-auto px-6">
+      {/* Header */}
       <header className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold">{film.title || "Untitled"}</h1>
-        <p className="text-muted mt-1">{film.prompt}</p>
-        <div className="flex items-center gap-3 mt-3">
-          <span className={`text-xs px-3 py-1 rounded-full ${
-            film.status === "completed" ? "bg-secondary/20 text-secondary"
-            : film.status === "failed" ? "bg-red-500/20 text-red-400"
-            : "bg-primary/20 text-primary"
-          }`}>{film.status}</span>
-          {film.status !== "completed" && (
-            <button onClick={generate} disabled={genLoading}
-              className="px-5 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-30">
-              {genLoading ? "Generating..." : "▶ Generate"}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl md:text-4xl font-bold">{film.title || "Untitled"}</h1>
+            {pipeline && (
+              <div className="flex gap-3 mt-2">
+                <span className="text-xs px-3 py-1 rounded-full bg-primary/20 text-primary">{pipeline.genre}</span>
+                <span className="text-xs px-3 py-1 rounded-full bg-secondary/20 text-secondary">{pipeline.tone}</span>
+                <span className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent">{Math.round((pipeline.durationSeconds || 0) / 60)} min</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="text-muted mt-2">{film.prompt}</p>
+
+        {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+
+        <div className="flex gap-3 mt-4 flex-wrap">
+          {film.status !== "completed" && film.status !== "failed" ? (
+            <button onClick={generate} disabled={genLoading || film.status === "running"}
+              className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 disabled:opacity-30">
+              {genLoading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />Generating...</>
+                : "▶ Run Full Pipeline"}
             </button>
+          ) : (
+            <>
+              <button onClick={infiniteMovie} disabled={genLoading}
+                className="px-6 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent/90 disabled:opacity-30">
+                ♾ Infinite Movie
+              </button>
+              <span className={`px-4 py-2 rounded-xl text-sm ${film.status === "completed" ? "bg-secondary/20 text-secondary" : "bg-red-500/20 text-red-400"}`}>
+                {film.status === "completed" ? "✓ Completed" : "✗ Failed"}
+              </span>
+            </>
           )}
         </div>
-        {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
       </header>
 
-      {film.status !== "completed" && film.status !== "pending" && (
+      {/* Pipeline Progress */}
+      {film.status !== "completed" && film.status !== "pending" && film.status !== "failed" && (
         <section className="mb-10">
-          <h2 className="text-lg font-semibold mb-4">Pipeline</h2>
+          <h2 className="text-lg font-semibold mb-4">Pipeline Progress</h2>
           <div className="grid gap-2">
-            {STEPS.map((s, i) => {
-              const done = stepIndex > i;
-              const active = stepIndex === i;
+            {PIPELINE.map((step, i) => {
+              const done = pipIndex > i;
+              const active = pipIndex === i;
               return (
-                <div key={s.key}
-                  className={`flex items-center gap-3 p-4 rounded-xl glass-card transition-all ${
-                    done ? "border-secondary/30" : active ? "border-primary shadow-lg shadow-primary/20" : "opacity-40"
+                <div key={step.id}
+                  className={`pipeline-step flex items-center gap-4 p-4 rounded-xl glass-card transition-all ${
+                    done ? "border-secondary/40" : active ? "border-primary pipeline-active" : "opacity-30"
                   }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    done ? "bg-secondary/20 text-secondary" : active ? "bg-primary/20 text-primary" : "bg-border text-muted"
-                  }`}>{done ? "✓" : i + 1}</div>
-                  <div>
-                    <div className={`font-medium ${active ? "text-white" : done ? "text-secondary" : "text-muted"}`}>{s.label}</div>
-                    <div className="text-xs text-muted">{s.desc}</div>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                    done ? "bg-secondary/20" : active ? "bg-primary/20" : "bg-border"
+                  }`}>{done ? "✓" : step.emoji}</div>
+                  <div className="flex-1">
+                    <div className={`font-medium ${active ? "text-white" : done ? "text-secondary" : "text-muted"}`}>{step.label}</div>
+                    <div className="text-xs text-muted">{step.desc}</div>
                   </div>
-                  {active && <div className="ml-auto w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />}
+                  {active && <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />}
+                  {done && <div className="text-secondary text-sm">Done</div>}
                 </div>
               );
             })}
@@ -146,57 +182,226 @@ export default function Project() {
         </section>
       )}
 
-      <div className="flex gap-4 border-b border-border mb-6">
-        {(["script", "video", "collab"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`pb-3 text-sm font-medium capitalize transition-colors ${
-              tab === t ? "text-primary border-b-2 border-primary" : "text-muted hover:text-white"
-            }`}>{t === "collab" ? "Co-Author" : t}</button>
+      {/* Tabs */}
+      <div className="flex gap-4 border-b border-border mb-6 overflow-x-auto">
+        {[
+          { id: "script", label: "📜 Script" },
+          { id: "scenes", label: "🎬 Scenes" },
+          { id: "characters", label: "🎭 Characters" },
+          { id: "music", label: "🎵 Music" },
+          { id: "export", label: "📺 Export" },
+          { id: "collab", label: "👥 Co-Author" },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`tab-btn pb-3 text-sm font-medium whitespace-nowrap transition-colors ${
+              tab === t.id ? "text-primary border-b-2 border-primary" : "text-muted hover:text-white"
+            }`}>{t.label}</button>
         ))}
       </div>
 
-      {tab === "script" && film.full_script && (
+      {/* Script Tab */}
+      {tab === "script" && (
         <div className="glass-card border-border rounded-2xl p-6">
-          <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300 font-sans">{film.full_script}</pre>
+          {film.fullScript ? (
+            <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300 font-sans">{film.fullScript}</pre>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted text-lg mb-2">No script yet</p>
+              <p className="text-muted text-sm">Click "Run Full Pipeline" to generate the complete screenplay.</p>
+            </div>
+          )}
         </div>
       )}
 
-      {tab === "video" && (
-        <div className="space-y-6">
-          {film.video_url && <video controls className="w-full rounded-2xl" src={film.video_url} />}
-          {film.trailer_url && <video controls className="w-full max-w-lg rounded-xl" src={film.trailer_url} />}
-          {film.cover_image_url && <img src={film.cover_image_url} alt="Poster" className="w-64 rounded-xl" />}
-          {!film.video_url && !film.trailer_url && <p className="text-muted">Video will appear after generation.</p>}
+      {/* Scenes Tab */}
+      {tab === "scenes" && (
+        <div className="space-y-4">
+          {scenes.length === 0 && <p className="text-muted text-center py-8">No scenes generated yet.</p>}
+          {scenes.map((scene: any, i: number) => (
+            <div key={scene.id || i}
+              className="glass-card border-border rounded-2xl overflow-hidden cursor-pointer"
+              onClick={() => setExpandedScene(expandedScene === i ? null : i)}>
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+                    {scene.number || i + 1}
+                  </div>
+                  <div>
+                    <div className="font-medium">{scene.title}</div>
+                    <div className="text-xs text-muted">{scene.location} — {scene.timeOfDay}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2 py-1 rounded-full bg-border text-muted">{scene.durationSeconds}s</span>
+                  <span className="text-xs">{expandedScene === i ? "▲" : "▼"}</span>
+                </div>
+              </div>
+              {expandedScene === i && (
+                <div className="px-4 pb-4 border-t border-border pt-3 space-y-3 text-sm">
+                  <p className="text-gray-400">{scene.summary}</p>
+                  {scene.cameraMovement && (
+                    <div>
+                      <span className="text-muted text-xs">📷 Camera:</span>
+                      <p className="text-gray-400">{scene.cameraMovement}</p>
+                    </div>
+                  )}
+                  {scene.musicCue && (
+                    <div>
+                      <span className="text-muted text-xs">🎵 Music:</span>
+                      <p className="text-gray-400">{scene.musicCue}</p>
+                    </div>
+                  )}
+                  {scene.dialogue && scene.dialogue.length > 0 && (
+                    <div>
+                      <span className="text-muted text-xs">💬 Dialogue:</span>
+                      {scene.dialogue.map((d: any, di: number) => (
+                        <p key={di} className="text-gray-300 mt-1">
+                          <span className="text-primary font-medium">{d.character}</span>
+                          <span className="text-muted text-xs"> ({d.emotion}): </span>
+                          {d.text}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {scene.soundEffects && scene.soundEffects.length > 0 && (
+                    <div>
+                      <span className="text-muted text-xs">🔊 SFX: </span>
+                      <span className="text-gray-400">{scene.soundEffects.join(", ")}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Characters Tab */}
+      {tab === "characters" && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {(!pipeline?.characters || pipeline.characters.length === 0) && (
+            <p className="text-muted text-center py-8 col-span-2">No characters generated yet.</p>
+          )}
+          {(pipeline?.characters || []).map((char: any, i: number) => (
+            <div key={i} className="glass-card border-border rounded-2xl p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-2xl">
+                  {["👨‍🚀", "👩‍🔬", "🧙‍♂️", "🕵️", "🤖", "🧛"][i % 6]}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{char.name}</h3>
+                  <p className="text-xs text-muted">{char.role || char.voiceType || "Character"}</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div><span className="text-muted">Personality:</span> <span className="text-gray-300">{char.personality}</span></div>
+                <div><span className="text-muted">Motivation:</span> <span className="text-gray-300">{char.motivation}</span></div>
+                <div><span className="text-muted">Goal:</span> <span className="text-gray-300">{char.goal}</span></div>
+                <div><span className="text-muted">Arc:</span> <span className="text-gray-300">{char.arc}</span></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Music Tab */}
+      {tab === "music" && (
+        <div className="space-y-3">
+          {(!pipeline?.musicTracks || pipeline.musicTracks.length === 0) && (
+            <p className="text-muted text-center py-8">No music tracks generated yet.</p>
+          )}
+          {(pipeline?.musicTracks || []).map((track: any, i: number) => (
+            <div key={i} className="glass-card border-border rounded-xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-lg">🎵</div>
+              <div className="flex-1">
+                <div className="font-medium">Scene {i + 1}: <span className="text-secondary">{track.mood}</span></div>
+                <div className="text-xs text-muted mt-1">
+                  ♩ {track.tempo} BPM · Key: {track.key} · {track.instruments?.join(", ")}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Export Tab */}
+      {tab === "export" && (
+        <div className="glass-card border-border rounded-2xl p-6">
+          <h3 className="font-semibold text-lg mb-4">Export Options</h3>
+          {film.status === "completed" ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              {[
+                { label: "📜 PDF Script", desc: "Download full screenplay as PDF", action: "#" },
+                { label: "🎞 Trailer", desc: "30-second cinematic trailer", action: "#" },
+                { label: "🖼 Poster", desc: "AI-generated movie poster", action: film.coverImageUrl || "#" },
+                { label: "📱 TikTok Clip", desc: "Vertical short for social media", action: "#" },
+                { label: "🎬 Full Film", desc: "Complete movie MP4 (when video backend is connected)", action: film.videoUrl || "#" },
+                { label: "📄 Plain Text", desc: "Script in plain text format", action: "#" },
+              ].map((item, i) => (
+                <div key={i} className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all cursor-pointer"
+                  onClick={() => item.action !== "#" && window.open(item.action, "_blank")}>
+                  <div className="font-medium mb-1">{item.label}</div>
+                  <div className="text-xs text-muted">{item.desc}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted text-center py-8">Generate the film first to see export options.</p>
+          )}
+        </div>
+      )}
+
+      {/* Co-Author Tab */}
       {tab === "collab" && (
         <div className="space-y-6 max-w-xl">
-          <div>
-            <label className="text-sm font-medium text-muted mb-1 block">Rewrite Instruction</label>
+          <div className="glass-card border-border rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl">🔄</span>
+              <h3 className="font-semibold">Rewrite Mode</h3>
+            </div>
+            <p className="text-xs text-muted mb-3">
+              Tell AI to change anything: "Make the hero a villain", "Set it in Tokyo", "Add a dragon".
+              The AI rewrites the entire film automatically.
+            </p>
             <div className="flex gap-2">
               <input value={rewrite} onChange={(e) => setRewrite(e.target.value)}
-                placeholder='e.g. "Make protagonist a villain"'
+                placeholder='e.g. "Make the protagonist a villain"'
                 className="flex-1 p-3 rounded-xl glass-card border-border text-white placeholder-muted focus:outline-none focus:border-primary" />
               <button onClick={handleRewrite} className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90">Rewrite</button>
             </div>
           </div>
-          <div>
-            <label className="text-sm font-medium text-muted mb-1 block">Co-Author Suggestion</label>
+
+          <div className="glass-card border-border rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl">👥</span>
+              <h3 className="font-semibold">Co-Authoring</h3>
+            </div>
+            <p className="text-xs text-muted mb-3">
+              Multiple users can suggest ideas simultaneously.
+              AI analyzes all suggestions and integrates the best ones while keeping logical consistency.
+            </p>
             <div className="flex gap-2">
               <input value={suggestion} onChange={(e) => setSuggestion(e.target.value)}
-                placeholder='e.g. "Add a dragon"'
+                placeholder='e.g. "Add a dragon", "Kill the protagonist", "Set in Tokyo"'
                 className="flex-1 p-3 rounded-xl glass-card border-border text-white placeholder-muted focus:outline-none focus:border-primary" />
               <button onClick={handleCollab} className="px-6 py-3 rounded-xl bg-secondary text-black font-medium hover:bg-secondary/90">Suggest</button>
             </div>
           </div>
-          {film.co_authors && JSON.parse(film.co_authors || "[]").length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-muted mb-2">Suggestions</h3>
-              <div className="space-y-2">
-                {JSON.parse(film.co_authors || "[]").map((c: any, i: number) => (
+
+          {film.coAuthors && JSON.parse(film.coAuthors || "[]").length > 0 && (
+            <div className="glass-card border-border rounded-2xl p-5">
+              <h3 className="font-semibold mb-4">Suggestions</h3>
+              <div className="space-y-3">
+                {JSON.parse(film.coAuthors).map((c: any, i: number) => (
                   <div key={i} className="p-3 rounded-xl glass-card border-border text-sm">
-                    <span className="text-muted">{c.user_id}:</span> {c.suggestion}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                        {c.user_id?.slice(-2) || "??"}
+                      </span>
+                      <span className="text-muted text-xs">{c.user_id}</span>
+                      {c.timestamp && <span className="text-muted text-xs ml-auto">{new Date(c.timestamp).toLocaleTimeString()}</span>}
+                    </div>
+                    <p className="text-gray-300">"{c.suggestion}"</p>
                   </div>
                 ))}
               </div>

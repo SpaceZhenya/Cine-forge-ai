@@ -1,4 +1,4 @@
-// API calls go to the same Next.js server — no separate backend needed.
+// API client — calls Next.js API routes (same server)
 
 async function req<T>(path: string, opts?: Record<string, unknown>): Promise<T> {
   const res = await fetch(path, {
@@ -21,10 +21,11 @@ export const api = {
 
   listFilms: () => req<any[]>("/api/films"),
 
-  generateFilm: (id: string) =>
-    req<{ id: string; status: string }>(`/api/films/${id}/generate`, {
-      method: "POST",
-    }),
+  generateFilm: (id: string, infinite?: boolean) =>
+    req<{ id: string; status: string; title: string }>(
+      `/api/films/${id}/generate${infinite ? "?infinite=true" : ""}`,
+      { method: "POST" }
+    ),
 
   rewriteFilm: (id: string, instruction: string) =>
     req<{ id: string; status: string }>(`/api/films/${id}/rewrite`, {

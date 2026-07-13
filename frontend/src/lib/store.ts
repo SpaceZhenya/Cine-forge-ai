@@ -1,43 +1,52 @@
-// In-memory store — shared across all API routes.
-// Films persist only while the server is running.
+// In-memory store with full pipeline support
 
-import { randomUUID } from "crypto";
-const uuid = () => randomUUID();
+import { runFullPipeline, type FilmResult } from "./pipeline";
 
 export interface Film {
   id: string;
   title: string;
   status: string;
   prompt: string;
-  full_script: string;
+  genre: string;
+  tone: string;
   logline: string;
-  video_url: string;
-  trailer_url: string;
-  cover_image_url: string;
-  co_authors: string;
+  fullScript: string;
+  pipelineResult: FilmResult | null;
+  videoUrl: string;
+  trailerUrl: string;
+  coverImageUrl: string;
+  coAuthors: string;
   version: number;
-  parent_id: string;
-  created_at: string;
+  parentId: string;
+  isInfinite: boolean;
+  createdAt: string;
 }
 
 const store = new Map<string, Film>();
 
+let counter = 0;
+
 export function createFilm(prompt: string): Film {
-  const id = uuid().slice(0, 8);
+  counter++;
+  const id = Date.now().toString(36) + counter.toString(36);
   const film: Film = {
     id,
     title: "",
     status: "pending",
     prompt,
-    full_script: "",
+    genre: "",
+    tone: "",
     logline: "",
-    video_url: "",
-    trailer_url: "",
-    cover_image_url: "",
-    co_authors: "[]",
+    fullScript: "",
+    pipelineResult: null,
+    videoUrl: "",
+    trailerUrl: "",
+    coverImageUrl: "",
+    coAuthors: "[]",
     version: 1,
-    parent_id: "",
-    created_at: new Date().toISOString(),
+    parentId: "",
+    isInfinite: false,
+    createdAt: new Date().toISOString(),
   };
   store.set(id, film);
   return film;
@@ -48,43 +57,98 @@ export function getFilm(id: string): Film | undefined {
 }
 
 export function listFilms(): Film[] {
-  return Array.from(store.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  ).slice(0, 50);
+  return Array.from(store.values())
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 50);
 }
 
 export function generateFilm(id: string): Film | undefined {
   const film = store.get(id);
   if (!film) return undefined;
 
-  const words = film.prompt.split(/\s+/).filter(w => w.length > 0);
-  const title = words.length > 2
-    ? words.slice(0, 3).map(w => w[0].toUpperCase() + w.slice(1)).join(" ")
-    : film.prompt.slice(0, 30);
+  film.status = "running";
 
-  const logline = `In a world where ${film.prompt.toLowerCase().replace(/[.!?]$/, "")}, one person must confront the unimaginable.`;
+  try {
+    const result = runFullPipeline(film.prompt);
 
-  const scenes = [
-    ["The Silence", "ISS Observation Deck", "Alex stares at the void where Earth should be."],
-    ["Last Transmission", "Communications Bay", "Frantically working the radio. Only static."],
-    ["Fading Signal", "Main Corridor", "Searching every window. Nothing but stars."],
-    ["The Void Below", "Lower Module", "Descending into darkness. The hull creaks ominously."],
-    ["Echoes of Earth", "Quarters", "Old photos. Memories of family. The weight of solitude."],
-    ["Desperate Calculations", "Lab Module", "The orbital math doesn't add up. Something impossible happened."],
-    ["The Final Broadcast", "Comm Station", "Recording a message to anyone listening. Raw. Honest."],
-    ["Into the Unknown", "Airlock", "A daring plan: descend into the atmosphere."],
-    ["Ghost in the Machine", "AI Core", "The station AI shows strange data. Hiding something."],
-    ["The Last Dawn", "Capsule", "Strapping in. Ready to plunge into the unknown."],
-  ];
+    film.title = result.title;
+    film.genre = result.genre;
+    film.tone = result.tone;
+    film.logline = result.logline;
+    film.fullScript = result.fullScript;
+    film.pipelineResult = result;
+    film.status = "completed";
 
-  let script = `# ${title}\n\n**${logline}**\n\n`;
-  for (let i = 0; i < scenes.length; i++) {
-    script += `## Scene ${i + 1}: ${scenes[i][0]}\n*${scenes[i][1]}*\n\n${scenes[i][2]}\n\n`;
+    // Generate poster URL
+    film.coverImageUrl = `/api/poster/${id}`;
+  } catch (e) {
+    film.status = "failed";
   }
 
-  film.title = title;
-  film.logline = logline;
-  film.full_script = script;
+  return film;
+}
+
+export function infiniteMovie(id: string): Film | undefined {
+  const film = store.get(id);
+  if (!film || !film.pipelineResult) return undefined;
+
+  film.isInfinite = true;
+
+  // Continue the story: add more scenes
+  const result = film.pipelineResult;
+  const lastScene = result.scenes[result.scenes.length - 1];
+  const newSceneNum = result.scenes.length + 1;
+
+  const continuationScenes = [
+    {
+      id: `s${newSceneNum}`,
+      number: newSceneNum,
+      title: "The Next Chapter",
+      location: lastScene.location,
+      timeOfDay: "Unknown",
+      summary: "The story continues... New challenges await beyond the horizon.",
+      dialogue: [
+        { character: result.characters[0]?.name || "Hero", text: "What now?", emotion: "uncertain" },
+        { character: result.characters[1]?.name || "Guide", text: "The journey is far from over.", emotion: "mysterious" },
+      ],
+      cameraMovement: "Slow reveal, wide angle",
+      emotionalTone: "Mystery",
+      durationSeconds: 30,
+      storyboardPrompt: "Continue the cinematic journey...",
+      musicCue: "Evolving ambient, new theme emerging",
+      soundEffects: ["wind", "distant thunder"],
+    },
+    {
+      id: `s${newSceneNum + 1}`,
+      number: newSceneNum + 1,
+      title: "The Infinite Horizon",
+      location: "The Edge of Known World",
+      timeOfDay: "Twilight",
+      summary: "The protagonist steps into the unknown. The story never ends.",
+      dialogue: [
+        { character: result.characters[0]?.name || "Hero", text: "There's no end to this, is there?", emotion: "realization" },
+        { character: "Narrator", text: "Every ending is a new beginning.", emotion: "omniscient" },
+      ],
+      cameraMovement: "Infinite zoom out, then zoom in",
+      emotionalTone: "Wonder",
+      durationSeconds: 25,
+      storyboardPrompt: "Infinite horizon, cinematic wide shot...",
+      musicCue: "End credits that loop back to main theme",
+      soundEffects: ["heartbeat", "whisper"],
+    },
+  ];
+
+  result.scenes.push(...continuationScenes);
+  result.durationSeconds += 55;
+  result.fullScript += "\n\n— INFINITE MODE —\n\nThe story continues...\n\n";
+  for (const s of continuationScenes) {
+    result.fullScript += `\n## Scene ${s.number}: ${s.title}\n*${s.location}*\n${s.summary}\n`;
+    for (const line of s.dialogue) {
+      result.fullScript += `\n**${line.character}**: ${line.text}`;
+    }
+  }
+
+  film.fullScript = result.fullScript;
   film.status = "completed";
   return film;
 }
@@ -93,21 +157,26 @@ export function rewriteFilm(id: string, instruction: string): Film | undefined {
   const original = store.get(id);
   if (!original) return undefined;
 
-  const newId = uuid().slice(0, 8);
+  counter++;
+  const newId = Date.now().toString(36) + counter.toString(36);
   const film: Film = {
     id: newId,
     title: "",
     status: "pending",
     prompt: `${original.prompt}. REWRITE: ${instruction}`,
-    full_script: "",
+    genre: "",
+    tone: "",
     logline: "",
-    video_url: "",
-    trailer_url: "",
-    cover_image_url: "",
-    co_authors: "[]",
-    version: original.version + 1,
-    parent_id: id,
-    created_at: new Date().toISOString(),
+    fullScript: "",
+    pipelineResult: null,
+    videoUrl: "",
+    trailerUrl: "",
+    coverImageUrl: "",
+    coAuthors: "[]",
+    version: (original.version || 1) + 1,
+    parentId: id,
+    isInfinite: false,
+    createdAt: new Date().toISOString(),
   };
   store.set(newId, film);
   return film;
@@ -116,8 +185,8 @@ export function rewriteFilm(id: string, instruction: string): Film | undefined {
 export function addCollaboration(id: string, userId: string, suggestion: string): Film | undefined {
   const film = store.get(id);
   if (!film) return undefined;
-  const authors = JSON.parse(film.co_authors || "[]");
-  authors.push({ user_id: userId, suggestion });
-  film.co_authors = JSON.stringify(authors);
+  const authors = JSON.parse(film.coAuthors || "[]");
+  authors.push({ user_id: userId, suggestion, timestamp: new Date().toISOString() });
+  film.coAuthors = JSON.stringify(authors);
   return film;
 }
