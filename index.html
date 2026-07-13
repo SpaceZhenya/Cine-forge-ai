@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineForge AI</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050508; color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+nav {
+  position: fixed; top: 0; width: 100%; z-index: 50;
+  background: rgba(18,18,26,0.8); border-bottom: 1px solid #1e1e2a;
+  backdrop-filter: blur(12px); height: 60px;
+  display: flex; align-items: center; padding: 0 24px;
+}
+nav h1 { background: linear-gradient(135deg,#6C5CE7,#00CEC9,#FD79A8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 22px; }
+.container { max-width: 900px; margin: 0 auto; padding: 80px 20px 40px; }
+.hidden { display: none !important; }
+.card {
+  background: rgba(18,18,26,0.8); border: 1px solid #1e1e2a;
+  border-radius: 16px; padding: 20px; margin-bottom: 16px;
+}
+textarea {
+  width: 100%; min-height: 120px; padding: 16px; border-radius: 12px;
+  background: rgba(18,18,26,0.8); border: 1px solid #1e1e2a;
+  color: #fff; font-size: 16px; resize: vertical; font-family: inherit;
+}
+textarea:focus { outline: none; border-color: #6C5CE7; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 28px; border-radius: 12px; border: none; cursor: pointer;
+  font-size: 16px; font-weight: 600; transition: all .2s;
+}
+.btn-primary { background: #6C5CE7; color: #fff; }
+.btn-primary:hover { background: #5a4bd1; }
+.btn-primary:disabled { opacity: .3; cursor: not-allowed; }
+.btn-sm { padding: 10px 20px; font-size: 14px; }
+.btn-secondary { background: #00CEC9; color: #000; }
+.w-full { width: 100%; }
+.mt-4 { margin-top: 16px; }
+.mt-2 { margin-top: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.gap-2 { gap: 8px; }
+.flex { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.justify-center { justify-content: center; }
+.text-center { text-align: center; }
+.text-muted { color: #6b6b80; }
+.text-sm { font-size: 14px; }
+.text-xl { font-size: 24px; }
+.text-error { color: #ef4444; }
+.chip {
+  padding: 8px 16px; border-radius: 20px; font-size: 13px;
+  background: rgba(18,18,26,0.8); border: 1px solid #1e1e2a;
+  color: #6b6b80; cursor: pointer; transition: all .2s;
+}
+.chip:hover { color: #fff; border-color: #6C5CE7; }
+.badge {
+  font-size: 12px; padding: 4px 12px; border-radius: 20px;
+  display: inline-block;
+}
+.badge-pending { background: rgba(108,92,231,0.2); color: #6C5CE7; }
+.badge-completed { background: rgba(0,206,201,0.2); color: #00CEC9; }
+.badge-running { background: rgba(108,92,231,0.2); color: #6C5CE7; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.spinner {
+  width: 20px; height: 20px; border: 2px solid rgba(108,92,231,0.3);
+  border-top-color: #6C5CE7; border-radius: 50%; animation: spin .6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.tab {
+  padding: 10px 0; margin-right: 16px; cursor: pointer;
+  font-size: 14px; color: #6b6b80; border-bottom: 2px solid transparent;
+  transition: all .2s;
+}
+.tab.active { color: #6C5CE7; border-bottom-color: #6C5CE7; }
+.tab:hover { color: #fff; }
+.script-view { white-space: pre-wrap; font-size: 14px; line-height: 1.7; color: #ccc; }
+input[type="text"] {
+  flex: 1; padding: 12px 16px; border-radius: 12px;
+  background: rgba(18,18,26,0.8); border: 1px solid #1e1e2a;
+  color: #fff; font-size: 14px; font-family: inherit;
+}
+input[type="text"]:focus { outline: none; border-color: #6C5CE7; }
+.error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<nav><h1>CineForge AI</h1></nav>
+
+<div class="container" id="app">
+  <!-- Home -->
+  <div id="home">
+    <div class="text-center" style="padding: 60px 0 40px">
+      <h1 style="font-size:48px;font-weight:800;line-height:1.2;margin-bottom:16px">
+        <span style="background:linear-gradient(135deg,#6C5CE7,#00CEC9,#FD79A8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">One Prompt.</span><br>
+        <span style="color:#fff">Full Movie.</span>
+      </h1>
+      <p class="text-muted" style="font-size:18px;max-width:500px;margin:0 auto 32px">
+        Describe your film idea. CineForge AI generates script, scenes, music, and trailer.
+      </p>
+    </div>
+    <textarea id="prompt-input" placeholder="Describe your film idea..."></textarea>
+    <div id="home-error" class="text-error text-sm mt-2 hidden"></div>
+    <button class="btn btn-primary w-full mt-4" id="generate-btn" onclick="createFilm()">Generate Film</button>
+    <div class="flex flex-wrap justify-center gap-2 mt-4">
+      <button class="chip" onclick="setPrompt('Триллер про астронавта, который понимает, что Земля исчезла')">Триллер про астронавта...</button>
+      <button class="chip" onclick="setPrompt('Комедия о роботе-доставщике, который влюбился в кота')">Комедия о роботе...</button>
+      <button class="chip" onclick="setPrompt('Хоррор про старую больницу, где пациенты исчезают по ночам')">Хоррор про больницу...</button>
+    </div>
+  </div>
+
+  <!-- Project -->
+  <div id="project" class="hidden">
+    <div id="project-error" class="error-box hidden"></div>
+    <div id="project-header"></div>
+    <div id="project-tabs" style="display:flex;border-bottom:1px solid #1e1e2a;margin-bottom:16px">
+      <div class="tab active" data-tab="script" onclick="switchTab('script')">Script</div>
+      <div class="tab" data-tab="video" onclick="switchTab('video')">Video</div>
+      <div class="tab" data-tab="collab" onclick="switchTab('collab')">Co-Author</div>
+    </div>
+    <div id="tab-script" class="script-view card"></div>
+    <div id="tab-video" class="hidden card">
+      <p class="text-muted">Video generation requires a media backend. Script is ready!</p>
+    </div>
+    <div id="tab-collab" class="hidden">
+      <div class="card">
+        <label class="text-sm text-muted" style="display:block;margin-bottom:8px">Rewrite Instruction</label>
+        <div class="flex gap-2">
+          <input type="text" id="rewrite-input" placeholder='e.g. "Make protagonist a villain"'>
+          <button class="btn btn-primary btn-sm" onclick="rewriteFilm()">Rewrite</button>
+        </div>
+      </div>
+      <div class="card">
+        <label class="text-sm text-muted" style="display:block;margin-bottom:8px">Co-Author Suggestion</label>
+        <div class="flex gap-2">
+          <input type="text" id="collab-input" placeholder='e.g. "Add a dragon"'>
+          <button class="btn btn-secondary btn-sm" onclick="collaborate()">Suggest</button>
+        </div>
+      </div>
+      <div id="suggestions-list"></div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="hidden text-center" style="padding:80px 0">
+    <div class="spinner" style="width:40px;height:40px;margin:0 auto 16px"></div>
+    <p class="text-muted">Loading...</p>
+  </div>
+</div>
+
+<script>
+// ─── Store ────────────────────────────────────────
+const store = {};
+
+function createFilmStore(prompt) {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  store[id] = {
+    id, title: '', status: 'pending', prompt, full_script: '', logline: '',
+    video_url: '', trailer_url: '', cover_image_url: '', co_authors: '[]',
+    version: 1, parent_id: '', created_at: new Date().toISOString()
+  };
+  return store[id];
+}
+
+function getFilm(id) { return store[id]; }
+
+function generateFilm(id) {
+  const film = store[id];
+  if (!film) return null;
+
+  const words = film.prompt.split(/\s+/).filter(Boolean);
+  const title = words.length > 2
+    ? words.slice(0, 3).map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+    : film.prompt.slice(0, 30);
+
+  const logline = `In a world where ${film.prompt.toLowerCase().replace(/[.!?]$/, '')}, one person must confront the unimaginable.`;
+
+  const scenes = [
+    ['The Silence', 'ISS Observation Deck', 'Alex stares at the void where Earth should be.'],
+    ['Last Transmission', 'Communications Bay', 'Frantically working the radio. Only static.'],
+    ['Fading Signal', 'Main Corridor', 'Searching every window. Nothing but stars.'],
+    ['The Void Below', 'Lower Module', 'Descending into darkness. The hull creaks ominously.'],
+    ['Echoes of Earth', 'Quarters', 'Old photos. Memories of family. The weight of solitude.'],
+    ['Desperate Calculations', 'Lab Module', 'The orbital math does not add up. Something impossible happened.'],
+    ['The Final Broadcast', 'Comm Station', 'Recording a message to anyone listening. Raw. Honest.'],
+    ['Into the Unknown', 'Airlock', 'A daring plan: descend into the atmosphere.'],
+    ['Ghost in the Machine', 'AI Core', 'The station AI shows strange data. Hiding something.'],
+    ['The Last Dawn', 'Capsule', 'Strapping in. Ready to plunge into the unknown.'],
+  ];
+
+  let script = `# ${title}\n\n**${logline}**\n\n`;
+  for (let i = 0; i < scenes.length; i++) {
+    script += `## Scene ${i + 1}: ${scenes[i][0]}\n*${scenes[i][1]}*\n\n${scenes[i][2]}\n\n`;
+  }
+
+  film.title = title;
+  film.logline = logline;
+  film.full_script = script;
+  film.status = 'completed';
+  return film;
+}
+
+function rewriteFilmStore(id, instruction) {
+  const original = store[id];
+  if (!original) return null;
+  const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  store[newId] = {
+    id: newId, title: '', status: 'pending',
+    prompt: `${original.prompt}. REWRITE: ${instruction}`,
+    full_script: '', logline: '', video_url: '', trailer_url: '', cover_image_url: '',
+    co_authors: '[]', version: original.version + 1, parent_id: id,
+    created_at: new Date().toISOString()
+  };
+  return store[newId];
+}
+
+function addCollab(id, userId, suggestion) {
+  const film = store[id];
+  if (!film) return null;
+  const authors = JSON.parse(film.co_authors || '[]');
+  authors.push({ user_id: userId, suggestion });
+  film.co_authors = JSON.stringify(authors);
+  return film;
+}
+
+// ─── UI ───────────────────────────────────────────
+let currentFilmId = null;
+
+function show(id) {
+  document.querySelectorAll('#home,#project,#loading').forEach(el => el.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function setPrompt(text) {
+  document.getElementById('prompt-input').value = text;
+}
+
+async function createFilm() {
+  const input = document.getElementById('prompt-input');
+  const btn = document.getElementById('generate-btn');
+  const err = document.getElementById('home-error');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creating...';
+  err.classList.add('hidden');
+
+  try {
+    const film = createFilmStore(prompt);
+    currentFilmId = film.id;
+    showProject();
+  } catch (e) {
+    err.textContent = e.message || 'Failed to create film';
+    err.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Film';
+  }
+}
+
+async function generate() {
+  if (!currentFilmId) return;
+  const film = getFilm(currentFilmId);
+  if (!film) return;
+
+  film.status = 'running';
+  showProject();
+
+  setTimeout(() => {
+    generateFilm(currentFilmId);
+    showProject();
+  }, 500);
+}
+
+function showProject() {
+  show('project');
+  const film = getFilm(currentFilmId);
+  if (!film) {
+    document.getElementById('project-error').textContent = 'Film not found';
+    document.getElementById('project-error').classList.remove('hidden');
+    document.getElementById('project-header').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('project-error').classList.add('hidden');
+
+  const statusClass = film.status === 'completed' ? 'badge-completed'
+    : film.status === 'running' ? 'badge-running' : 'badge-pending';
+  const statusText = film.status === 'completed' ? 'Completed'
+    : film.status === 'running' ? 'Generating...' : 'Pending';
+
+  document.getElementById('project-header').innerHTML = `
+    <h2 style="font-size:28px;font-weight:700;margin-bottom:4px">${film.title || 'Untitled'}</h2>
+    <p class="text-muted text-sm" style="margin-bottom:8px">${film.prompt}</p>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="badge ${statusClass}">${statusText}</span>
+      ${film.status !== 'completed' ? `<button class="btn btn-primary btn-sm" onclick="generate()">${film.status === 'running' ? '<span class="spinner"></span>' : '▶ Generate'}</button>` : ''}
+    </div>
+  `;
+
+  // Script tab
+  document.getElementById('tab-script').innerHTML = film.full_script
+    ? film.full_script : '<p class="text-muted">Click "Generate" to create the script.</p>';
+
+  // Suggestions
+  const authors = JSON.parse(film.co_authors || '[]');
+  const list = document.getElementById('suggestions-list');
+  if (authors.length > 0) {
+    list.innerHTML = '<h3 style="font-size:14px;color:#6b6b80;margin-bottom:8px">Suggestions</h3>'
+      + authors.map(c => `<div class="card" style="padding:12px;margin-bottom:8px;font-size:14px"><span class="text-muted">${c.user_id}:</span> ${c.suggestion}</div>`).join('');
+  } else {
+    list.innerHTML = '';
+  }
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+  ['script','video','collab'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+  });
+}
+
+function rewriteFilm() {
+  const input = document.getElementById('rewrite-input');
+  const instruction = input.value.trim();
+  if (!instruction || !currentFilmId) return;
+
+  const newFilm = rewriteFilmStore(currentFilmId, instruction);
+  if (newFilm) {
+    currentFilmId = newFilm.id;
+    input.value = '';
+    showProject();
+  }
+}
+
+function collaborate() {
+  const input = document.getElementById('collab-input');
+  const suggestion = input.value.trim();
+  if (!suggestion || !currentFilmId) return;
+
+  const userId = 'user_' + Math.random().toString(36).slice(2, 8);
+  const film = addCollab(currentFilmId, userId, suggestion);
+  if (film) {
+    input.value = '';
+    showProject();
+  }
+}
+
+// Keyboard shortcut
+document.getElementById('prompt-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); createFilm(); }
+});
+</script>
+</body>
+</html>
