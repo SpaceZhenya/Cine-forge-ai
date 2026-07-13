@@ -1,0 +1,16 @@
+{
+  "name": "cineforge-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One prompt → full movie. AI-powered film generation platform.",
+  "scripts": {
+    "backend": "cd backend && python run.py",
+    "frontend": "cd frontend && npm run dev",
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend && pip install -r requirements.txt",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
