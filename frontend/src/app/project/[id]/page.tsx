@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 
@@ -28,6 +28,9 @@ export default function Project() {
   const [rewrite, setRewrite] = useState("");
   const [suggestion, setSuggestion] = useState("");
   const [expandedScene, setExpandedScene] = useState<number | null>(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [ttsPlaying, setTtsPlaying] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -89,6 +92,30 @@ export default function Project() {
     }
   };
 
+  const playAudio = () => {
+    if (audioPlaying) {
+      audioRef.current?.pause();
+      setAudioPlaying(false);
+      return;
+    }
+    const audio = new Audio(`/api/audio/${id}`);
+    audioRef.current = audio;
+    audio.onended = () => setAudioPlaying(false);
+    audio.play().then(() => setAudioPlaying(true)).catch(() => setAudioPlaying(false));
+  };
+
+  const speak = (text: string, voice: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = 0.9;
+    utterance.pitch = voice.includes("female") ? 1.2 : voice.includes("young") ? 1.3 : 0.8;
+    utterance.onstart = () => setTtsPlaying(text);
+    utterance.onend = () => setTtsPlaying(null);
+    window.speechSynthesis.speak(utterance);
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -124,6 +151,7 @@ export default function Project() {
                 <span className="text-xs px-3 py-1 rounded-full bg-primary/20 text-primary">{pipeline.genre}</span>
                 <span className="text-xs px-3 py-1 rounded-full bg-secondary/20 text-secondary">{pipeline.tone}</span>
                 <span className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent">{Math.round((pipeline.durationSeconds || 0) / 60)} min</span>
+                {film.isInfinite && <span className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent">♾ Infinite</span>}
               </div>
             )}
           </div>
@@ -237,6 +265,8 @@ export default function Project() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); const lines = scene.dialogue?.map((d: any) => d.text).join(". "); if (lines) speak(lines, "default"); }}
+                    className="text-xs px-2 py-1 rounded bg-secondary/20 text-secondary hover:bg-secondary/30">🔊</button>
                   <span className="text-xs px-2 py-1 rounded-full bg-border text-muted">{scene.durationSeconds}s</span>
                   <span className="text-xs">{expandedScene === i ? "▲" : "▼"}</span>
                 </div>
@@ -260,10 +290,14 @@ export default function Project() {
                     <div>
                       <span className="text-muted text-xs">💬 Dialogue:</span>
                       {scene.dialogue.map((d: any, di: number) => (
-                        <p key={di} className="text-gray-300 mt-1">
+                        <p key={di} className="text-gray-300 mt-1 flex items-start gap-2">
                           <span className="text-primary font-medium">{d.character}</span>
                           <span className="text-muted text-xs"> ({d.emotion}): </span>
-                          {d.text}
+                          <span className="flex-1">{d.text}</span>
+                          <button onClick={(e) => { e.stopPropagation(); speak(d.text, d.character); }}
+                            className="text-xs px-2 py-0.5 rounded bg-secondary/20 text-secondary hover:bg-secondary/30 shrink-0">
+                            {ttsPlaying === d.text ? "🔊" : "🔈"}
+                          </button>
                         </p>
                       ))}
                     </div>
@@ -297,6 +331,10 @@ export default function Project() {
                   <h3 className="font-semibold text-lg">{char.name}</h3>
                   <p className="text-xs text-muted">{char.role || char.voiceType || "Character"}</p>
                 </div>
+                <button onClick={() => speak(`I am ${char.name}. ${char.personality}. My goal is ${char.goal}.`, char.voiceType)}
+                  className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-secondary/20 text-secondary hover:bg-secondary/30">
+                  {ttsPlaying?.includes(char.name) ? "🔊" : "🔈"} Voice
+                </button>
               </div>
               <div className="space-y-2 text-sm">
                 <div><span className="text-muted">Personality:</span> <span className="text-gray-300">{char.personality}</span></div>
@@ -315,6 +353,15 @@ export default function Project() {
           {(!pipeline?.musicTracks || pipeline.musicTracks.length === 0) && (
             <p className="text-muted text-center py-8">No music tracks generated yet.</p>
           )}
+          <div className="flex items-center gap-3 mb-2">
+            <button onClick={playAudio}
+              className="px-4 py-2 rounded-xl bg-secondary/20 text-secondary hover:bg-secondary/30 text-sm font-medium">
+              {audioPlaying ? "⏹ Stop Soundtrack" : "▶ Play Full Soundtrack"}
+            </button>
+            <span className="text-xs text-muted">
+              {pipeline?.musicTracks?.length || 0} tracks · ~{Math.round((pipeline?.durationSeconds || 0) / 60)} min
+            </span>
+          </div>
           {(pipeline?.musicTracks || []).map((track: any, i: number) => (
             <div key={i} className="glass-card border-border rounded-xl p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-lg">🎵</div>
@@ -335,20 +382,58 @@ export default function Project() {
           <h3 className="font-semibold text-lg mb-4">Export Options</h3>
           {film.status === "completed" ? (
             <div className="grid md:grid-cols-2 gap-4">
-              {[
-                { label: "📜 PDF Script", desc: "Download full screenplay as PDF", action: "#" },
-                { label: "🎞 Trailer", desc: "30-second cinematic trailer", action: "#" },
-                { label: "🖼 Poster", desc: "AI-generated movie poster", action: film.coverImageUrl || "#" },
-                { label: "📱 TikTok Clip", desc: "Vertical short for social media", action: "#" },
-                { label: "🎬 Full Film", desc: "Complete movie MP4 (when video backend is connected)", action: film.videoUrl || "#" },
-                { label: "📄 Plain Text", desc: "Script in plain text format", action: "#" },
-              ].map((item, i) => (
-                <div key={i} className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all cursor-pointer"
-                  onClick={() => item.action !== "#" && window.open(item.action, "_blank")}>
-                  <div className="font-medium mb-1">{item.label}</div>
-                  <div className="text-xs text-muted">{item.desc}</div>
-                </div>
-              ))}
+              <a href={`/api/export/${id}/script`} target="_blank"
+                className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all block">
+                <div className="font-medium mb-1">📄 Plain Text Script</div>
+                <div className="text-xs text-muted">Download screenplay as .txt</div>
+              </a>
+              <a href={`/api/trailer/${id}`} target="_blank"
+                className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all block">
+                <div className="font-medium mb-1">🎞 Trailer MP4</div>
+                <div className="text-xs text-muted">15-second cinematic trailer</div>
+              </a>
+              <a href={film.coverImageUrl || "#"} target="_blank"
+                className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all block">
+                <div className="font-medium mb-1">🖼 Poster</div>
+                <div className="text-xs text-muted">AI-generated movie poster (SVG)</div>
+              </a>
+              <button onClick={playAudio}
+                className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all text-left">
+                <div className="font-medium mb-1">{audioPlaying ? "⏹ Stop Music" : "🎵 Play Soundtrack"}</div>
+                <div className="text-xs text-muted">Generated from film music metadata</div>
+              </button>
+              <div className="p-4 rounded-xl glass-card border-border opacity-60">
+                <div className="font-medium mb-1">📱 TikTok Clip</div>
+                <div className="text-xs text-muted">Coming soon</div>
+              </div>
+              <div className="p-4 rounded-xl glass-card border-border opacity-60">
+                <div className="font-medium mb-1">🎬 Full Film</div>
+                <div className="text-xs text-muted">Coming soon</div>
+              </div>
+              <button onClick={() => {
+                const s = JSON.stringify(film.pipeline, null, 2);
+                const blob = new Blob([s], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = "film-data.json"; a.click();
+                URL.revokeObjectURL(url);
+              }}
+                className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all text-left">
+                <div className="font-medium mb-1">📊 Film Data (JSON)</div>
+                <div className="text-xs text-muted">Export all film data as JSON</div>
+              </button>
+              <button onClick={() => {
+                if (!film.fullScript) return;
+                const win = window.open("", "_blank");
+                if (!win) return;
+                win.document.write(`<html><head><title>${film.title || "Script"}</title><style>body{font-family:monospace;padding:40px;max-width:800px;margin:auto;line-height:1.6}pre{white-space:pre-wrap}</style></head><body><h1>${film.title || "Untitled"}</h1><pre>${film.fullScript.replace(/</g, "&lt;")}</pre></body></html>`);
+                win.document.close();
+                win.print();
+              }}
+                className="p-4 rounded-xl glass-card border-border hover:border-primary/50 transition-all text-left">
+                <div className="font-medium mb-1">🖨 Print / PDF</div>
+                <div className="text-xs text-muted">Print to PDF from browser</div>
+              </button>
             </div>
           ) : (
             <p className="text-muted text-center py-8">Generate the film first to see export options.</p>
