@@ -22,12 +22,15 @@ export interface Film {
   createdAt: string;
 }
 
-const store = new Map<string, Film>();
-
-let counter = 0;
+// Use globalThis to survive Next.js hot reloads in dev mode
+const g = globalThis as any;
+if (!g.__cineforgeStore) g.__cineforgeStore = new Map<string, Film>();
+if (g.__cineforgeCounter === undefined) g.__cineforgeCounter = 0;
+const store: Map<string, Film> = g.__cineforgeStore;
+let counter: number = g.__cineforgeCounter;
 
 export function createFilm(prompt: string): Film {
-  counter++;
+  g.__cineforgeCounter = ++counter;
   const id = Date.now().toString(36) + counter.toString(36);
   const film: Film = {
     id,
