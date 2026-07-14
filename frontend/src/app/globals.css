@@ -33,3 +33,62 @@ body {
 .pipeline-active {
   animation: pulse-glow 1.5s ease-in-out infinite;
 }
+
+/* Ghost Developer specific */
+@keyframes gd-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes gd-pulse-dot {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes gd-slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gd-typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.gd-cursor-blink::after {
+  content: "|";
+  animation: gd-blink 1s infinite;
+  color: #007acc;
+}
+
+.gd-status-dot {
+  animation: gd-pulse-dot 2s ease-in-out infinite;
+}
+
+.gd-timeline-item {
+  animation: gd-slide-in 0.3s ease-out;
+}
+
+.gd-typing-animate {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: gd-typing 0.5s steps(30, end);
+}
+
+.gd-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.gd-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gd-scroll::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+.gd-scroll::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
