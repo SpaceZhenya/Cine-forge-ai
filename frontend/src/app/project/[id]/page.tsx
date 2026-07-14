@@ -41,7 +41,7 @@ export default function Project() {
     }
   }, [id]);
 
-  useEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i); }, [load]);
+  useEffect(() => { load(); const i = setInterval(load, 2000); return () => clearInterval(i); }, [load]);
 
   const generate = async () => {
     setGenLoading(true);
@@ -133,15 +133,15 @@ export default function Project() {
         {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
         <div className="flex gap-3 mt-4 flex-wrap">
-          {film.status !== "completed" && film.status !== "failed" ? (
-            <button onClick={generate} disabled={genLoading || film.status === "running"}
+          {film.status === "pending" ? (
+            <button onClick={generate} disabled={genLoading}
               className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 disabled:opacity-30">
-              {genLoading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />Generating...</>
+              {genLoading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />Starting...</>
                 : "▶ Run Full Pipeline"}
             </button>
-          ) : (
+          ) : film.status === "completed" || film.status === "failed" ? (
             <>
-              <button onClick={infiniteMovie} disabled={genLoading}
+              <button onClick={infiniteMovie} disabled={genLoading || film.status === "failed"}
                 className="px-6 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent/90 disabled:opacity-30">
                 ♾ Infinite Movie
               </button>
@@ -149,6 +149,11 @@ export default function Project() {
                 {film.status === "completed" ? "✓ Completed" : "✗ Failed"}
               </span>
             </>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <span className="text-primary font-medium">Pipeline running...</span>
+            </div>
           )}
         </div>
       </header>

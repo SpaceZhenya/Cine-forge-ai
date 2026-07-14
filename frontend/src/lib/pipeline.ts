@@ -48,14 +48,20 @@ function stageProducer(prompt: string) {
   const promptLower = prompt.toLowerCase();
 
   const genreMap: Record<string, string> = {
-    action: "Action", comedy: "Comedy", drama: "Drama", thriller: "Thriller",
-    horror: "Horror", fantasy: "Fantasy", romance: "Romance", scifi: "Sci-Fi",
-    sci: "Sci-Fi", space: "Sci-Fi", astronaut: "Sci-Fi", alien: "Sci-Fi",
-    dragon: "Fantasy", magic: "Fantasy", sword: "Fantasy", medieval: "Fantasy",
-    future: "Sci-Fi", robot: "Sci-Fi", ai: "Sci-Fi", detective: "Thriller",
-    mystery: "Thriller", spy: "Thriller", war: "Action", battle: "Action",
-    love: "Romance", romantic: "Romance", funny: "Comedy", hilarious: "Comedy",
-    dark: "Horror", ghost: "Horror", monster: "Horror", zombie: "Horror",
+    action: "Action", battle: "Action", war: "Action",
+    comedy: "Comedy", funny: "Comedy", hilarious: "Comedy", laugh: "Comedy",
+    drama: "Drama", emotional: "Drama",
+    thriller: "Thriller", mystery: "Thriller", detective: "Thriller", spy: "Thriller",
+    horror: "Horror", scary: "Horror", ghost: "Horror", monster: "Horror",
+    zombie: "Horror", dark: "Horror", haunt: "Horror",
+    fantasy: "Fantasy", magic: "Fantasy", dragon: "Fantasy", sword: "Fantasy",
+    medieval: "Fantasy", kingdom: "Fantasy",
+    romance: "Romance", love: "Romance", romantic: "Romance",
+    scifi: "Sci-Fi", space: "Sci-Fi", astronaut: "Sci-Fi", alien: "Sci-Fi",
+    future: "Sci-Fi", robot: "Sci-Fi", ai: "Sci-Fi", planet: "Sci-Fi",
+    galaxy: "Sci-Fi", cyber: "Sci-Fi", quantum: "Sci-Fi",
+    western: "Western", cowboy: "Western",
+    musical: "Musical", song: "Musical", sing: "Musical",
   };
 
   let genre = "Sci-Fi";
@@ -65,19 +71,23 @@ function stageProducer(prompt: string) {
     if (score > bestScore) { bestScore = score; genre = val; }
   }
 
-  const tone = /dark|disappear|void|empty|shadow|alone|death/.test(promptLower) ? "Dark"
+  const tone = /dark|disappear|void|empty|shadow|alone|death|vanish|haunt/.test(promptLower) ? "Dark"
     : /hope|survive|rescue|find|return|light|beautiful/.test(promptLower) ? "Hopeful"
     : /funny|comedy|laugh|ridiculous/.test(promptLower) ? "Light"
     : /mystery|secret|strange|unknown/.test(promptLower) ? "Mysterious"
     : "Epic";
 
   const words = prompt.split(/\s+/).filter(w => w.length > 2);
-  const significant = words.filter(w => /[A-ZА-Я]/.test(w[0]) || w.length > 5);
+  const significant = words.filter(w => /[A-ZА-ЯЁ]/.test(w[0]) || w.length > 5);
   const title = significant.length >= 2
     ? significant.slice(0, 3).join(" ")
     : words.slice(0, 3).map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
 
-  const logline = `In a world where ${promptLower.replace(/[.!?]$/, "")}, ${charStart(genre)} must confront the unimaginable.`;
+  const logline = genre === "Comedy"
+    ? `When ${promptLower.replace(/[.!?]$/, "")}, ${charStart(genre)} finds themselves in the most ridiculous situation imaginable.`
+    : genre === "Horror"
+    ? `${promptLower.replace(/[.!?]$/, "")}. ${charStart(genre)} must survive before it's too late.`
+    : `In a world where ${promptLower.replace(/[.!?]$/, "")}, ${charStart(genre)} must confront the unimaginable.`;
 
   return { title: title || "Untitled", genre, tone, logline };
 }

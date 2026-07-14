@@ -69,9 +69,24 @@ export function generateFilm(id: string): Film | undefined {
   const film = store.get(id);
   if (!film) return undefined;
 
-  film.status = "running";
+  if (film.status !== "pending" && film.status !== "failed") return film;
 
+  film.status = "producing";
+  film.pipelineResult = null;
+
+  runPipelineAsync(film);
+
+  return film;
+}
+
+async function runPipelineAsync(film: Film) {
   try {
+    const stages = ["producing", "screenwriting", "directing", "storyboarding", "camera", "acting", "voicing", "composing", "editing"];
+    for (const stage of stages) {
+      film.status = stage;
+      await new Promise(r => setTimeout(r, 800));
+    }
+
     const result = runFullPipeline(film.prompt);
 
     film.title = result.title;
@@ -81,14 +96,10 @@ export function generateFilm(id: string): Film | undefined {
     film.fullScript = result.fullScript;
     film.pipelineResult = result;
     film.status = "completed";
-
-    // Generate poster URL
-    film.coverImageUrl = `/api/poster/${id}`;
+    film.coverImageUrl = `/api/poster/${film.id}`;
   } catch (e) {
     film.status = "failed";
   }
-
-  return film;
 }
 
 export function infiniteMovie(id: string): Film | undefined {
