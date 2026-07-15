@@ -26,13 +26,13 @@ export function VSCodeLayout() {
             <div className="flex-1 flex flex-col min-w-0">
               <div className="flex items-center h-9 bg-[#252526] border-b border-[#3c3c3c] px-4 text-xs text-[#cccccc] overflow-x-auto gap-1 shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${state.connected ? "bg-green-500 status-dot" : "bg-red-500"}`} />
+                  <span className={`w-2 h-2 rounded-full ${state.connected ? "bg-green-500 gd-status-dot" : "bg-red-500"}`} />
                   <span className="text-[#858585]">GHOST DEVELOPER</span>
                 </div>
                 <span className="mx-3 text-[#3c3c3c]">|</span>
                 <span className="text-[#858585]">Agent Status:</span>
                 <span className="text-[#4ec9b0]">{state.running ? "Running" : state.events.length > 0 ? "Completed" : "Idle"}</span>
-                {state.running && <span className="w-1.5 h-1.5 rounded-full bg-green-500 status-dot ml-1" />}
+                {state.running && <span className="w-1.5 h-1.5 rounded-full bg-green-500 gd-status-dot ml-1" />}
                 {state.currentFile && (
                   <>
                     <span className="mx-3 text-[#3c3c3c]">|</span>

@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  experimental: {
-    turbo: {
-      root: __dirname,
-    },
+  webpack: (config, { isServer }) => {
+    if (config.cache && !isServer) {
+      config.cache = false;
+    }
+    return config;
   },
 };
 

@@ -36,7 +36,7 @@ export function Terminal() {
             key={i}
             className={`${
               line.startsWith("$ ") ? "text-[#4ec9b0]" : line.includes("error") || line.includes("Error") || line.includes("FAIL") ? "text-[#f44747]" : line.includes("passed") || line.includes("success") ? "text-[#4ec9b0]" : "text-[#cccccc]"
-            } ${i === lines.length - 1 ? "cursor-blink" : ""}`}
+            } ${i === lines.length - 1 ? "gd-cursor-blink" : ""}`}
           >
             {line}
           </div>

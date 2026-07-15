@@ -26,6 +26,37 @@ interface AgentContextType {
 
 const AgentContext = createContext<AgentContextType | null>(null);
 
+const TIMELINE_ICONS: Record<string, { label: string; icon: string }> = {
+  scan_start: { label: "Repository Scan", icon: "🔍" },
+  scan_progress: { label: "Scanning project", icon: "📂" },
+  scan_complete: { label: "Scan complete", icon: "✅" },
+  read_file: { label: "Reading file", icon: "📖" },
+  edit_file: { label: "Editing file", icon: "✏️" },
+  create_file: { label: "Creating file", icon: "📄" },
+  npm_start: { label: "Installing packages", icon: "📦" },
+  npm_progress: { label: "Installing packages", icon: "📦" },
+  npm_complete: { label: "Packages installed", icon: "✅" },
+  build_start: { label: "Building", icon: "🔨" },
+  build_progress: { label: "Building", icon: "🔨" },
+  build_error: { label: "Build error", icon: "❌" },
+  build_complete: { label: "Build success", icon: "✅" },
+  test_start: { label: "Running tests", icon: "🧪" },
+  test_result: { label: "Tests complete", icon: "📊" },
+  task_complete: { label: "Completed", icon: "🎉" },
+  terminal_output: { label: "Terminal", icon: "💻" },
+};
+
+function getTimelineEvent(event: AgentEvent): { label: string; icon: string } {
+  const info = TIMELINE_ICONS[event.type];
+  if (info) return info;
+
+  const text = event.payload?.text as string | undefined;
+  const path = event.payload?.path as string | undefined;
+  if (text) return { label: text, icon: "•" };
+  if (path) return { label: path, icon: "📄" };
+  return { label: event.type, icon: "•" };
+}
+
 export function AgentProvider({ children }: { children: React.ReactNode }) {
   const ws = useRef<WebSocket | null>(null);
   const [state, setState] = useState<AgentState>({
@@ -41,7 +72,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     running: false,
   });
   const startTime = useRef(0);
-  const eventCount = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   const connect = useCallback(() => {
@@ -54,27 +84,50 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     socket.onmessage = (raw) => {
       try {
         const event: AgentEvent = JSON.parse(raw.data);
-        eventCount.current++;
+        if (!event.type) return;
 
         setState(prev => {
           const newEvents = [...prev.events, event];
-          const newTimeline = addToTimeline(prev.timeline, event);
-          const newTerminal = ["terminal_output", "npm_install", "npm_test", "build_start", "build_failed", "build_success"].includes(event.type)
-            ? [...prev.terminalOutput, (event.type === "build_start" || event.type === "npm_install" || event.type === "npm_test") ? `$ ${event.text || ""}` : event.text || ""]
-            : prev.terminalOutput;
-          const newFiles = prev.filesModified.includes(event.path || "") ? prev.filesModified : event.path ? [...prev.filesModified, event.path] : prev.filesModified;
-          const progress = event.type === "completed" ? 100 : event.type === "build_failed" ? 60 : Math.min((eventCount.current / 31) * 100, 95);
+          const info = getTimelineEvent(event);
+          const entry = { label: info.label, icon: info.icon, active: true };
+          const exists = prev.timeline.some(e => e.label === info.label);
+          const newTimeline = exists ? prev.timeline : [...prev.timeline, entry];
+
+          let newTerminal = prev.terminalOutput;
+          if (event.type === "terminal_output") {
+            const line = (event.payload?.line as string) || "";
+            newTerminal = [...prev.terminalOutput, line];
+          } else if (event.type === "build_error") {
+            const msg = (event.payload?.message as string) || "Build error";
+            newTerminal = [...prev.terminalOutput, `ERROR: ${msg}`];
+          } else if (["npm_start", "build_start", "test_start"].includes(event.type)) {
+            const text = (event.payload?.command as string) || event.type;
+            newTerminal = [...prev.terminalOutput, `$ ${text}`];
+          }
+
+          const path = event.payload?.path as string | undefined;
+          const content = event.payload?.content as string | undefined;
+          const newFiles = path && !prev.filesModified.includes(path)
+            ? [...prev.filesModified, path]
+            : prev.filesModified;
+
+          let progress = prev.progress;
+          if (event.type === "task_complete") progress = 100;
+          else if (event.type === "build_error") progress = Math.max(progress, 60);
+          else if (event.type === "scan_start") progress = 5;
+          else if (event.type === "scan_complete") progress = 10;
+          else progress = Math.min(progress + 2, 95);
 
           return {
             ...prev,
             events: newEvents,
             timeline: newTimeline,
-            currentFile: event.path || prev.currentFile,
-            fileContent: event.content || prev.fileContent,
+            currentFile: path || prev.currentFile,
+            fileContent: content || prev.fileContent,
             terminalOutput: newTerminal.slice(-100),
             progress,
             filesModified: newFiles,
-            running: event.type !== "completed",
+            running: event.type !== "task_complete" && event.type !== "session_end",
           };
         });
       } catch {}
@@ -105,11 +158,10 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
   const startTask = useCallback((prompt: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) return;
-    eventCount.current = 0;
     setState(prev => ({
       ...prev, events: [], timeline: [], terminalOutput: [], progress: 0, elapsed: 0, filesModified: [], running: true, currentFile: null, fileContent: "",
     }));
-    ws.current.send(JSON.stringify({ type: "start_task", text: prompt }));
+    ws.current.send(JSON.stringify({ type: "run_task", text: prompt }));
   }, []);
 
   const stopTask = useCallback(() => {
@@ -130,32 +182,4 @@ export function useAgent() {
   const ctx = useContext(AgentContext);
   if (!ctx) throw new Error("useAgent must be used within AgentProvider");
   return ctx;
-}
-
-const TIMELINE_ICONS: Record<string, { label: string; icon: string }> = {
-  scanning: { label: "Repository Scan", icon: "🔍" },
-  searching: { label: "Analyzing project", icon: "📂" },
-  reading_file: { label: "Reading file", icon: "📖" },
-  editing_file: { label: "Editing file", icon: "✏️" },
-  terminal_output: { label: "Terminal", icon: "💻" },
-  npm_install: { label: "Installing packages", icon: "📦" },
-  npm_test: { label: "Running tests", icon: "🧪" },
-  build_start: { label: "Building", icon: "🔨" },
-  build_success: { label: "Build success", icon: "✅" },
-  build_failed: { label: "Build failed", icon: "❌" },
-  fixing_errors: { label: "Fixing errors", icon: "🔧" },
-  completed: { label: "Completed", icon: "🎉" },
-  status_update: { label: "Status", icon: "ℹ️" },
-  thinking: { label: "Thinking", icon: "🤔" },
-};
-
-function addToTimeline(current: AgentState["timeline"], event: AgentEvent) {
-  const info = TIMELINE_ICONS[event.type] || { label: event.type, icon: "•" };
-  const label = event.text || info.label;
-  const entry = { label, icon: info.icon, active: true };
-
-  const idx = current.findIndex(e => e.label === label);
-  if (idx >= 0) return current;
-
-  return [...current, entry];
 }

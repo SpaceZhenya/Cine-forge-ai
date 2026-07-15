@@ -47,7 +47,7 @@ export function AgentTimeline() {
               animate={{ opacity: 1, x: 0, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
-              className="timeline-item"
+              className="gd-timeline-item"
             >
               <div className="flex items-start gap-3 px-4 py-2 hover:bg-[#2a2d2e]">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 ${
